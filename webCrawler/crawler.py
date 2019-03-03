@@ -17,7 +17,7 @@ class Crawler:
                 }
         msg = ''
         try:
-            res = request.urlopen(self.path_name)
+            res = request.urlopen(self.path_name, timeout=3)
             if 'text/html' in res.getheader('Content-Type'):
                 parser = MyHtmlParser(self.base_url, self.http_protocol)
                 parser.feed(res.read().decode('utf-8'))
@@ -26,6 +26,6 @@ class Crawler:
                     "image_links": parser.get_image_links()
                 }
         except Exception as e:
-            msg = 'Not all the links were fetchable as the crawling website has blocked oue request!'
+            msg = 'Some Links were not crawled as they were taking more than 5 seconds to respond or the server was throwing a 403!!'
 
         return link_collection, msg

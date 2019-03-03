@@ -5,7 +5,8 @@ import threading
 
 
 class CrawlerManager:
-    number_of_threads = 8
+    number_of_threads = 1
+    max_allowed_thread = 64
 
     def __init__(self, url, number_of_levels):
         self.url = url
@@ -18,10 +19,16 @@ class CrawlerManager:
         self.msg = ''
         self.threadList = []
         self.waiting_queue.add(url)
+        self.end_program = False
+        self.lock_threads = True
         for _ in range(self.number_of_levels):
+            self.lock_all_threads()
+            self.check_if_more_threads_required()
             self.move_wait_que_to_que()
-            self.create_threads()
-            self.wait_for_threads_to_close()
+            self.unlock_all_threads()
+            self.wait_for_all_thread_to_idle()
+        self.end_program = True
+        self.wait_for_threads_to_close()
 
 
 ############################### thread Helpers #####################################
@@ -30,9 +37,22 @@ class CrawlerManager:
         flag = True
         while flag:
             flag = False
-            for t in self.threadList:
+            for thread_entry in self.threadList:
+                t = thread_entry['thread']
                 if t in threading.enumerate():
                     flag = True
+        return
+
+    def wait_for_all_thread_to_idle(self):
+        print('Start of the waiting for idle')
+        flag = True
+        while flag:
+            flag = False
+            for thread_entry in self.threadList:
+                idle = thread_entry['idle']
+                if not idle:
+                    flag = True
+        print('END of the waiting for idle')
         return
 
     def move_wait_que_to_que(self):
@@ -40,18 +60,52 @@ class CrawlerManager:
                 self.queue.put(q)
         self.waiting_queue = set()
 
-    def create_threads(self):
-        for _ in range(CrawlerManager.number_of_threads):
-            t = threading.Thread(target=self.work)
+    def create_threads(self, n):
+        for _ in range(n):
+            t = threading.Thread(target=self.work, daemon=True)
             t.start()
-            self.threadList.append(t)
+            self.threadList.append({'thread': t, 'idle': True})
 
     def work(self):
-        while self.queue.qsize():
-            url = self.queue.get()
-            self.run_crawler(url)
-            self.queue.task_done()
+        while not self.end_program:
+            if not self.lock_threads and self.queue.qsize():
+                self.activate_thread()
+                url = self.queue.get()
+                self.run_crawler(url)
+                self.queue.task_done()
+            else:
+                self.make_thread_idle()
 
+    def make_thread_idle(self):
+        for i, thread_entry in enumerate(self.threadList):
+            t = thread_entry['thread']
+            if t == threading.current_thread():
+                self.threadList[i]['idle'] = True
+
+    def activate_thread(self):
+        for i, thread_entry in enumerate(self.threadList):
+            t = thread_entry['thread']
+            if t == threading.current_thread():
+                self.threadList[i]['idle'] = False
+
+    def lock_all_threads(self):
+        self.lock_threads = True
+
+    def unlock_all_threads(self):
+        self.lock_threads = False
+
+    # Todo Need to aadd logic to control the number of threads required based on the wating list
+    def check_if_more_threads_required(self):
+        if len(self.waiting_queue) < CrawlerManager.max_allowed_thread:
+            self.number_of_threads = len(self.waiting_queue)
+            if len(self.threadList) < self.number_of_threads:
+                self.create_threads(self.number_of_threads - len(self.threadList))
+        return
+
+    def print_thread_list(self):
+        for t in self.threadList:
+            print(t)
+        print("###########################################################################")
 ############################### thread Helpers #####################################
 
     def run_crawler(self, path):
