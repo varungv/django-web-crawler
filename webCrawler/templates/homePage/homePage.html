@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <!-- jQuery library -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <script>
+    function getData(){
+        var url = document.getElementById('urlAddress').value;
+        $.post("/crawler/crawl/",
+            {
+               'url': url,
+               'numberOfLevels': document.getElementById('numberOfLevels').value
+            }, function(data, status){
+                if(data.msg){
+                    alert(data.msg);
+                }
+
+                if(data.links.links.length){
+                    document.getElementById('link_count').innerHTML = 'FOUND ' + data.links.links.length + ' links';
+                    var ul = document.getElementById('qeued_links');
+                    ul.innerHTML = '';
+                    for(var i=0; i<data.links.links.length; i++){
+                        var li = document.createElement('li');
+                        li.innerHTML = "<a href='" + data.links.links[i] + "' target='_blank'>" + data.links.links[i] + "</a>";
+                        ul.appendChild(li);
+                    }
+                }
+
+                if(data.links.images.length){
+                    document.getElementById('image_count').innerHTML = ' FOUND ' + data.links.images.length + ' images'
+                    var img_div = document.getElementById('image_links');
+                    img_div.innerHTML = '';
+                    for(var i=0; i<data.links.images.length; i++){
+                        var img = document.createElement('li');
+                        img.innerHTML += data.links.images[i];
+                        img_div.appendChild(img);
+                    }
+                }
+
+            }
+        );
+    }
+</script>
+</head>
+<body>
+    <h2>Web Crawler</h2>
+    {% csrf_token %}
+    <input type="text" name="urlAddress" id="urlAddress" >
+    <select id="numberOfLevels">
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+    </select>
+    <button type="submit" onclick="getData()">Crawl</button>
+    <span id="link_count"></span><span id="image_count"></span>
+    <h2>Links</h2>
+    <ul id="qeued_links"></ul>
+
+    <h2>IMAGES</h2>
+    <div id="image_links"></div>
+</body>
+</html>
